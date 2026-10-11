@@ -261,3 +261,12 @@ KAMDEF String_View sv_trim(String_View sv)
 {
     return sv_trim_right(sv_trim_left(sv));
 }
+
+KAMDEF int sv_find(String_View haystack, String_View needle) {
+    for (size_t i = 0; needle.count < haystack.count; i++) {
+        if (sv_starts_with(haystack, needle)) {
+            return int(i);
+        }
+    }
+    return -1;
+}
