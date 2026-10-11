@@ -1,0 +1,263 @@
+#include <ctype.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <assert.h>
+
+typedef uint8_t   u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
+typedef int8_t    i8;
+typedef int16_t  i16;
+typedef int32_t  i32;
+typedef int64_t  i64;
+
+#define KAMDEF static inline
+
+#define da_reserve(da, expected_capacity)                                                                   \
+    do {                                                                                                    \
+        if ((expected_capacity) > (da)->capacity) {                                                         \
+            if ((da)->capacity == 0) {                                                                      \
+                (da)->capacity = 256;                                                                       \
+            }                                                                                               \
+            while ((expected_capacity) > (da)->capacity) {                                                  \
+                (da)->capacity *= 2;                                                                        \
+            }                                                                                               \
+            (da)->items = decltype((da)->items)realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
+            assert((da)->items != NULL);                                                                    \
+         }                                                                                                  \
+      } while (0)
+
+#define da_append(da, item)                \
+    do {                                       \
+        da_reserve((da), (da)->count + 1);     \
+        (da)->items[(da)->count++] = (item);   \
+    } while (0)
+
+#define da_append_many(da, new_items, new_items_count)                                          \
+    do {                                                                                        \
+        da_reserve((da), (da)->count + (new_items_count));                                      \
+        memcpy((da)->items + (da)->count, (new_items), (new_items_count)*sizeof(*(da)->items)); \
+        (da)->count += (new_items_count);                                                       \
+    } while (0)
+
+#define da_pop(da) (da)->items[(assert((da)->count > 0), --(da)->count)]
+#define da_first(da) (da)->items[(assert((da)->count > 0), 0)]
+#define da_last(da) (da)->items[(assert((da)->count > 0), (da)->count-1)]
+#define da_foreach(Type, it, da) for (Type *it = (da)->items; it < (da)->items + (da)->count; ++it)
+#define da_free(da) free((da).items)
+
+#define array_len(array) (sizeof(array)/sizeof(array[0]))
+#define array_get(array, index) \
+(assert((size_t)index < array_len(array)), array[(size_t)index])
+
+#define TODO(message) do { fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+#define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+
+#define min(a, b) (((a) < (b)) ? (a) : (b))
+#define max(a, b) (((a) > (b)) ? (a) : (b))
+#define align_up_pow2(n, p) (((u64)(n) + ((u64)(p) - 1)) & (-((u64)(p) - 1)))
+#define arena_base_pos (sizeof(arena))
+#define arena_align (sizeof(void*))
+
+typedef struct {
+    u64 capacity;
+    u64 pos;
+} mem_arena;
+
+KAMDEF mem_arena *arena_create(u64 capacity) {
+    mem_arena *arena = (mem_arena*)malloc(capacity);
+
+    arena->capacity = capacity;
+    arena->pos = arena_base_pos;
+
+    return arena;
+}
+
+KAMDEF void arena_destroy(mem_arena *arena) {
+    free(arena);
+}
+
+KAMDEF void *arena_push(mem_arena *arena, u64 size, bool non_zero) {
+    u64 pos_aligned = align_up_pow2(arena->pos, arena_align);
+    u64 new_pos = pos_aligned + size;
+
+    if (new_pos > arena->capacity) return NULL;
+
+    arena->pos = new_pos;
+
+    u8 *out = (u8*)arena + pos_aligned;
+
+    if (!non_zero) memset(out, 0, size);
+
+    return out;
+}
+
+KAMDEF void arena_pop(mem_arena *arena, u64 size) {
+    size = min(size, arena->pos - arena_base_pos);
+    arena->pos -= size;
+}
+
+KAMDEF void arena_pop_to(mem_arena *arena, u64 pos) {
+    u64 size = pos < arena->pos ? arena->pos - pos : 0;
+
+    arena_pop(arena, size);
+}
+
+KAMDEF void arena_clear(mem_arena *arena) { arena_pop_to(arena, arena_base_pos); }
+
+typedef struct {
+    char *items;
+    size_t count;
+    size_t capacity;
+} String_Builder;
+
+#define sb_append_buf(sb, buf, size) da_append_many(sb, buf, size)
+#define sb_append_sv(sb, sv) sb_append_buf((sb), (sv).data, (sv).count)
+#define sb_append da_append
+
+typedef struct {
+    size_t count;
+    union {
+        const char *data;
+        const char *items;
+    };
+} String_View;
+
+KAMDEF String_View sv_from_cstr(const char *cstr) {
+    return (String_View) {
+        .count = strlen(cstr),
+        .data = cstr,
+    };
+}
+
+KAMDEF String_View sv_from_parts(const char *data, size_t count) {
+    String_View sv;
+    sv.count = count;
+    sv.data = data;
+    return sv;
+}
+
+KAMDEF bool sv_eq(String_View a, String_View b)
+{
+    if (a.count != b.count) {
+        return false;
+    } else {
+        return memcmp(a.data, b.data, a.count) == 0;
+    }
+}
+
+KAMDEF bool sv_starts_with(String_View sv, String_View expected_prefix) {
+    if (expected_prefix.count <= sv.count) {
+        String_View actual_prefix = sv_from_parts(sv.data, expected_prefix.count);
+        return sv_eq(expected_prefix, actual_prefix);
+    }
+
+    return false;
+}
+
+KAMDEF bool sv_ends_with(String_View sv, String_View suffix) {
+    if (sv.count >= suffix.count) {
+        String_View sv_tail = {
+            .count = suffix.count,
+            .data = sv.data + sv.count - suffix.count,
+        };
+        return sv_eq(sv_tail, suffix);
+    }
+    return false;
+}
+
+KAMDEF bool sv_ends_with_cstr(String_View sv, const char *cstr) {
+    return sv_ends_with(sv, sv_from_cstr(cstr));
+}
+
+KAMDEF String_View sv_chop_left(String_View *sv, size_t n)
+{
+    if (n > sv->count) {
+        n = sv->count;
+    }
+
+    String_View result = sv_from_parts(sv->data, n);
+
+    sv->data  += n;
+    sv->count -= n;
+
+    return result;
+}
+
+KAMDEF String_View sv_chop_right(String_View *sv, size_t n) {
+    if (n > sv->count) {
+        n = sv->count;
+    }
+
+    String_View result = sv_from_parts(sv->data + sv->count - n, n);
+
+    sv->count -= n;
+
+    return result;
+}
+
+KAMDEF String_View sv_chop_by_delim(String_View *sv, char delim) {
+    size_t i = 0;
+    while (i < sv->count && sv->data[i] != delim) {
+        i += 1;
+    }
+
+    String_View result = sv_from_parts(sv->data, i);
+
+    if (i < sv->count) {
+        sv->count -= i + 1;
+        sv->data  += i + 1;
+    } else {
+        sv->count -= i;
+        sv->data  += i;
+    }
+
+    return result;
+}
+
+KAMDEF bool sv_chop_prefix(String_View *sv, String_View prefix) {
+    if (sv_starts_with(*sv, prefix)) {
+        sv_chop_left(sv, prefix.count);
+        return true;
+    }
+    return false;
+}
+
+KAMDEF bool sv_chop_suffix(String_View *sv, String_View suffix)
+{
+    if (sv_ends_with(*sv, suffix)) {
+        sv_chop_right(sv, suffix.count);
+        return true;
+    }
+    return false;
+}
+
+KAMDEF String_View sv_trim_left(String_View sv)
+{
+    size_t i = 0;
+    while (i < sv.count && isspace(sv.data[i])) {
+        i += 1;
+    }
+
+    if (i == 0) return sv;
+    return sv_from_parts(sv.data + i, sv.count - i);
+}
+
+KAMDEF String_View sv_trim_right(String_View sv) {
+    size_t i = 0;
+    while (i < sv.count && isspace(sv.data[sv.count - 1 - i])) {
+        i += 1;
+    }
+
+    return sv_from_parts(sv.data, sv.count - i);
+}
+
+KAMDEF String_View sv_trim(String_View sv)
+{
+    return sv_trim_right(sv_trim_left(sv));
+}
