@@ -1,7 +1,14 @@
-default:
-	gcc src/main.c -o bin/8086 -Iinclude/ -Wall -Werror -Wextra -Wpedantic -O0 -g -fsanitize=address -lasan
+TARGET := bin/8086
+SRC := src/main.c
+CFLAGS := -Wall -Werror -Wextra -Wpedantic -O0 -g -fsanitize=address -lasan
 
-.PHONY: run
+default:
+	gcc $(SRC) -o $(TARGET) $(CFLAGS)
+
+.PHONY: run debug
 
 run: default
-	./bin/8086
+	./$(TARGET)
+
+debug: default
+	raddbg ./$(TARGET)

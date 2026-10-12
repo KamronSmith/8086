@@ -57,6 +57,7 @@ typedef int64_t  i64;
 
 #define TODO(message) do { fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
 #define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+#define UNUSED(value) (void)(value)
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
@@ -265,7 +266,7 @@ KAMDEF String_View sv_trim(String_View sv)
 KAMDEF int sv_find(String_View haystack, String_View needle) {
     for (size_t i = 0; needle.count < haystack.count; i++) {
         if (sv_starts_with(haystack, needle)) {
-            return int(i);
+            return (int)i;
         }
     }
     return -1;
