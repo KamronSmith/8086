@@ -378,6 +378,10 @@ void parse_instruction(u8 *buf, size_t size) {
         check_instruction(&mov, instruction_bytes);
         // mov.instruction = (buf[index] >> 2) & 0x3F;
 
+        if (mov.type == IMMED) {
+            mov.wb = (buf[index] >> 3) & 0b1;
+            mov.register_field = (buf[index] & 0x3);
+        }
         
         
         mov.direction = (buf[index] >> index) & 1;
