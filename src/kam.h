@@ -18,6 +18,8 @@ typedef int64_t  i64;
 
 #define KAMDEF static inline
 
+#define KAM_DECLTYPE(T)
+
 #define da_reserve(da, expected_capacity)                                                                   \
     do {                                                                                                    \
         if ((expected_capacity) > (da)->capacity) {                                                         \
@@ -27,16 +29,16 @@ typedef int64_t  i64;
             while ((expected_capacity) > (da)->capacity) {                                                  \
                 (da)->capacity *= 2;                                                                        \
             }                                                                                               \
-            (da)->items = decltype((da)->items)realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
+            (da)->items = KAM_DECLTYPE((da)->items)realloc((da)->items, (da)->capacity * sizeof(*(da)->items)); \
             assert((da)->items != NULL);                                                                    \
          }                                                                                                  \
       } while (0)
 
-#define da_append(da, item)                \
+#define da_append(da, item)                    \
     do {                                       \
         da_reserve((da), (da)->count + 1);     \
         (da)->items[(da)->count++] = (item);   \
-    } while (0)
+} while (0)
 
 #define da_append_many(da, new_items, new_items_count)                                          \
     do {                                                                                        \
@@ -119,32 +121,35 @@ typedef struct {
 
 #define sb_append_buf(sb, buf, size) da_append_many(sb, buf, size)
 #define sb_append_sv(sb, sv) sb_append_buf((sb), (sv).data, (sv).count)
+#define sb_append_null(sb) da_append_many(sb, "", 1)
+#define sb_append_cstr(sb, cstr)  \
+    do {                              \
+        const char *s = (cstr);       \
+        size_t n = strlen(s);         \
+        da_append_many(sb, s, n); \
+    } while (0)
 #define sb_append da_append
 
 typedef struct {
     size_t count;
-    union {
-        const char *data;
-        const char *items;
-    };
-} String_View;
+    const char *data;
+} String;
 
-KAMDEF String_View sv_from_cstr(const char *cstr) {
-    return (String_View) {
+KAMDEF String string_from_cstr(const char *cstr) {
+    return (String) {
         .count = strlen(cstr),
         .data = cstr,
     };
 }
 
-KAMDEF String_View sv_from_parts(const char *data, size_t count) {
-    String_View sv;
+KAMDEF String string_from_parts(const char *data, size_t count) {
+    String sv;
     sv.count = count;
     sv.data = data;
     return sv;
 }
 
-KAMDEF bool sv_eq(String_View a, String_View b)
-{
+KAMDEF bool string_eq(String a, String b) {
     if (a.count != b.count) {
         return false;
     } else {
@@ -152,120 +157,119 @@ KAMDEF bool sv_eq(String_View a, String_View b)
     }
 }
 
-KAMDEF bool sv_starts_with(String_View sv, String_View expected_prefix) {
-    if (expected_prefix.count <= sv.count) {
-        String_View actual_prefix = sv_from_parts(sv.data, expected_prefix.count);
-        return sv_eq(expected_prefix, actual_prefix);
+KAMDEF bool string_starts_with(String str, String expected_prefix) {
+    if (expected_prefix.count <= str.count) {
+        String actual_prefix = string_from_parts(str.data, expected_prefix.count);
+        return string_eq(expected_prefix, actual_prefix);
     }
 
     return false;
 }
 
-KAMDEF bool sv_ends_with(String_View sv, String_View suffix) {
-    if (sv.count >= suffix.count) {
-        String_View sv_tail = {
+KAMDEF bool string_ends_with(String str, String suffix) {
+    if (str.count >= suffix.count) {
+        String sv_tail = {
             .count = suffix.count,
-            .data = sv.data + sv.count - suffix.count,
+            .data = str.data + str.count - suffix.count,
         };
-        return sv_eq(sv_tail, suffix);
+        return string_eq(sv_tail, suffix);
     }
     return false;
 }
 
-KAMDEF bool sv_ends_with_cstr(String_View sv, const char *cstr) {
-    return sv_ends_with(sv, sv_from_cstr(cstr));
+KAMDEF bool str_ends_with_cstr(String str, const char *cstr) {
+    return string_ends_with(str, string_from_cstr(cstr));
 }
 
-KAMDEF String_View sv_chop_left(String_View *sv, size_t n)
-{
-    if (n > sv->count) {
-        n = sv->count;
+KAMDEF String string_chop_left(String *str, size_t n) {
+    if (n > str->count) {
+        n = str->count;
     }
 
-    String_View result = sv_from_parts(sv->data, n);
+    String result = string_from_parts(str->data, n);
 
-    sv->data  += n;
-    sv->count -= n;
+    str->data  += n;
+    str->count -= n;
 
     return result;
 }
 
-KAMDEF String_View sv_chop_right(String_View *sv, size_t n) {
-    if (n > sv->count) {
-        n = sv->count;
+KAMDEF String string_chop_right(String *str, size_t n) {
+    if (n > str->count) {
+        n = str->count;
     }
 
-    String_View result = sv_from_parts(sv->data + sv->count - n, n);
+    String result = string_from_parts(str->data + str->count - n, n);
 
-    sv->count -= n;
+    str->count -= n;
 
     return result;
 }
 
-KAMDEF String_View sv_chop_by_delim(String_View *sv, char delim) {
+KAMDEF String string_chop_by_delim(String *str, char delim) {
     size_t i = 0;
-    while (i < sv->count && sv->data[i] != delim) {
+    while (i < str->count && str->data[i] != delim) {
         i += 1;
     }
 
-    String_View result = sv_from_parts(sv->data, i);
+    String result = string_from_parts(str->data, i);
 
-    if (i < sv->count) {
-        sv->count -= i + 1;
-        sv->data  += i + 1;
+    if (i < str->count) {
+        str->count -= i + 1;
+        str->data  += i + 1;
     } else {
-        sv->count -= i;
-        sv->data  += i;
+        str->count -= i;
+        str->data  += i;
     }
 
     return result;
 }
 
-KAMDEF bool sv_chop_prefix(String_View *sv, String_View prefix) {
-    if (sv_starts_with(*sv, prefix)) {
-        sv_chop_left(sv, prefix.count);
+KAMDEF bool string_chop_prefix(String *str, String prefix) {
+    if (string_starts_with(*str, prefix)) {
+        string_chop_left(str, prefix.count);
         return true;
     }
     return false;
 }
 
-KAMDEF bool sv_chop_suffix(String_View *sv, String_View suffix)
+KAMDEF bool string_chop_suffix(String *str, String suffix)
 {
-    if (sv_ends_with(*sv, suffix)) {
-        sv_chop_right(sv, suffix.count);
+    if (string_ends_with(*str, suffix)) {
+        string_chop_right(str, suffix.count);
         return true;
     }
     return false;
 }
 
-KAMDEF String_View sv_trim_left(String_View sv)
+KAMDEF String string_trim_left(String str)
 {
     size_t i = 0;
-    while (i < sv.count && isspace(sv.data[i])) {
+    while (i < str.count && isspace(str.data[i])) {
         i += 1;
     }
 
-    if (i == 0) return sv;
-    return sv_from_parts(sv.data + i, sv.count - i);
+    if (i == 0) return str;
+    return string_from_parts(str.data + i, str.count - i);
 }
 
-KAMDEF String_View sv_trim_right(String_View sv) {
+KAMDEF String string_trim_right(String str) {
     size_t i = 0;
-    while (i < sv.count && isspace(sv.data[sv.count - 1 - i])) {
+    while (i < str.count && isspace(str.data[str.count - 1 - i])) {
         i += 1;
     }
 
-    return sv_from_parts(sv.data, sv.count - i);
+    return string_from_parts(str.data, str.count - i);
 }
 
-KAMDEF String_View sv_trim(String_View sv)
+KAMDEF String string_trim(String str)
 {
-    return sv_trim_right(sv_trim_left(sv));
+    return string_trim_right(string_trim_left(str));
 }
 
-KAMDEF int sv_find(String_View haystack, String_View needle) {
+KAMDEF int string_find(String haystack, String needle) {
     for (size_t i = 0; needle.count < haystack.count; i++) {
-        if (sv_starts_with(haystack, needle)) {
+        if (string_starts_with(haystack, needle)) {
             return (int)i;
         }
     }
