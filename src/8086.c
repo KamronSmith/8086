@@ -58,6 +58,7 @@ typedef struct {
     u8 rm_field;
     String_Builder reg1;
     String_Builder reg2;
+    i8 immed_value;
 } Inst;
 
 void print_instruction(Inst *mov) {
@@ -381,6 +382,17 @@ void parse_instruction(u8 *buf, size_t size) {
         if (mov.type == IMMED) {
             mov.wb = (buf[index] >> 3) & 0b1;
             mov.register_field = (buf[index] & 0x3);
+            mov.direction = true;
+            index++;
+            // mov.immed_value = buf[index];
+            i16 disp = buf[index];
+            char str[5];
+            snprintf(str, sizeof(str), "%d", disp);
+            sb_append_cstr(&mov.reg2, str);
+            determine_register(&mov, &mov.reg1);
+            print_instruction(&mov);
+            index++;
+            continue;
         }
         
         

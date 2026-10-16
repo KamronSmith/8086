@@ -1,5 +1,5 @@
 TARGET := bin/8086
-SRC := src/main.c
+SRC := src/8086.c
 CFLAGS := -Wall -Werror -Wextra -Wpedantic -O0 -g -fsanitize=address -lasan
 
 default:
