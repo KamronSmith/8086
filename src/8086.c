@@ -1,5 +1,6 @@
-#include "kam.h"
 #include <endian.h>
+#include "parse.h"
+#include "kam.h"
 
 #define OPCODE_MOVE 26
 #define DIRECTION_MASK (0b1)
@@ -7,59 +8,6 @@
 #define MOD_FIELD_MASK (0b11 << 6u)
 #define REG_FIELD_MASK (0b111)
 #define RM_FIELD_MASK (0b111)
-
-typedef enum {
-    MOD_NO_DISP,
-    MOD_8B_DISP,
-    MOD_16_DISP,
-    MOD_REG_MODE,
-} MOD_field;
-
-typedef enum {
-    AX,
-    CX,
-    DX,
-    BX,
-    SP,
-    BP,
-    SI,
-    DI,
-    AL,
-    CL,
-    DL,
-    BL,
-    AH,
-    CH,
-    DH,
-    BH,
-} Reg_Field;
-
-typedef enum {
-    SOURCE,
-    DEST,
-} DEST_field;
-
-typedef enum {
-    BYTE,
-    WORD,
-} WB_field;
-
-typedef enum {
-    NORM,
-    IMMED,
-} Inst_type;
-
-typedef struct {
-    Inst_type type;
-    DEST_field direction;
-    WB_field wb;
-    MOD_field mod;
-    u8 register_field;
-    u8 rm_field;
-    String_Builder reg1;
-    String_Builder reg2;
-    i8 immed_value;
-} Inst;
 
 void print_instruction(Inst *mov) {
     sb_append_null(&mov->reg1);
@@ -80,10 +28,35 @@ i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
 }
 
 void check_instruction(Inst *mov, u8 bytes) {
-    if (bytes == 0b100010) {
+    // TODO: have to create custom masks for each instruction
+    // or else we get in trouble
+    // norm 100010
+    // immediate to register 101100
+    // immediate to register wide 101110
+    // immediate to register mem 1100011
+    u8 norm_mask = (1u << 5) | (1u << 1);
+    u8 immed_mask = (1u << 5) | (1u << 3) | (1u << 2);
+    u8 immed_wide_mask = (1u << 5) | (1u << 3) | (1u << 2) | (1u << 1);
+    u8 immed_reg_mask = (1u << 6) | (1u << 5) | (1u << 1) | 1;
+
+    if (bytes - norm_mask == 0) {
         mov->type = NORM;
-    } else {
+        return;
+    }
+        
+    if (bytes - immed_mask == 0) {
         mov->type = IMMED;
+        return;
+    }
+
+    if (bytes - immed_wide_mask == 0) {
+        mov->type = IMMED;
+        return;
+    }
+
+    if (bytes - immed_reg_mask == 0) {
+        mov->type = IMMED_REG_MEM;
+        return;
     }
 }
 
@@ -411,13 +384,17 @@ void parse_instruction(u8 *buf, size_t size) {
     
     while (index < size) {
         Inst mov = {0};
-        u8 instruction_bytes = (buf[index] >> 2) & 0x3F;
+        u8 instruction_bytes = (buf[index] >> 2) & 0xFE;
         check_instruction(&mov, instruction_bytes);
         // mov.instruction = (buf[index] >> 2) & 0x3F;
 
         if (mov.type == IMMED) {
             parse_immed_instruction(&mov, buf, &index);
             continue;
+        }
+
+        if (mov.type == IMMED_REG_MEM) {
+            
         }
         
         
