@@ -398,7 +398,7 @@ void parse_instruction(u8 *buf, size_t size) {
         }
         
         
-        mov.direction = (buf[index] >> index) & 1;
+        mov.direction = (buf[index] >> 1) & 1;
         mov.wb = buf[index] & 0b1;
         index++;
         mov.mod = (buf[index] >> 6) & 0x3;
