@@ -71,11 +71,19 @@ void print_instruction(Inst *mov) {
     }
 }
 
+i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
+    u16 high_shifted = ((u16)(u8)high_byte << 8);
+
+    u16 combined = high_shifted | ((u16)(u8)low_byte);
+
+    return (i16)combined;
+}
+
 void check_instruction(Inst *mov, u8 bytes) {
-    if (bytes == 0b101100) {
-        mov->type = IMMED;
-    } else {
+    if (bytes == 0b100010) {
         mov->type = NORM;
+    } else {
+        mov->type = IMMED;
     }
 }
 
@@ -385,7 +393,21 @@ void parse_instruction(u8 *buf, size_t size) {
             mov.direction = true;
             index++;
             // mov.immed_value = buf[index];
-            i16 disp = buf[index];
+            i8 disp = buf[index];
+            
+            if (mov.wb == WORD) {
+                index++;
+                i16 disp_16 = combine_i8_to_i16(disp, buf[index]);
+                char str[7];
+                snprintf(str, sizeof(str), "%i", disp_16);
+                sb_append_cstr(&mov.reg2, str);
+                determine_register(&mov, &mov.reg1);
+                print_instruction(&mov);
+                index++;
+                disp = 0;
+                continue;
+            }
+            
             char str[5];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&mov.reg2, str);
