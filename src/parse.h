@@ -54,7 +54,6 @@ typedef struct {
     u8 rm_field;
     String_Builder reg1;
     String_Builder reg2;
-    i8 immed_value;
 } Inst;
 
 void print_instruction(Inst *mov);

@@ -356,7 +356,6 @@ void parse_immed_instruction(Inst *mov, u8 *buf, size_t *index) {
     mov->register_field = (buf[*index] & 0x3);
     mov->direction = true;
     (*index)++;
-    // mov.immed_value = buf[index];
     i8 disp = buf[*index];
 
     if (mov->wb == WORD) {
