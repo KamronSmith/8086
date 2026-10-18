@@ -1,5 +1,6 @@
-#include "kam.h"
 #include <endian.h>
+#include "parse.h"
+#include "kam.h"
 
 #define OPCODE_MOVE 26
 #define DIRECTION_MASK (0b1)
@@ -7,59 +8,6 @@
 #define MOD_FIELD_MASK (0b11 << 6u)
 #define REG_FIELD_MASK (0b111)
 #define RM_FIELD_MASK (0b111)
-
-typedef enum {
-    MOD_NO_DISP,
-    MOD_8B_DISP,
-    MOD_16_DISP,
-    MOD_REG_MODE,
-} MOD_field;
-
-typedef enum {
-    AX,
-    CX,
-    DX,
-    BX,
-    SP,
-    BP,
-    SI,
-    DI,
-    AL,
-    CL,
-    DL,
-    BL,
-    AH,
-    CH,
-    DH,
-    BH,
-} Reg_Field;
-
-typedef enum {
-    SOURCE,
-    DEST,
-} DEST_field;
-
-typedef enum {
-    BYTE,
-    WORD,
-} WB_field;
-
-typedef enum {
-    NORM,
-    IMMED,
-} Inst_type;
-
-typedef struct {
-    Inst_type type;
-    DEST_field direction;
-    WB_field wb;
-    MOD_field mod;
-    u8 register_field;
-    u8 rm_field;
-    String_Builder reg1;
-    String_Builder reg2;
-    i8 immed_value;
-} Inst;
 
 void print_instruction(Inst *mov) {
     sb_append_null(&mov->reg1);
@@ -80,10 +28,35 @@ i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
 }
 
 void check_instruction(Inst *mov, u8 bytes) {
-    if (bytes == 0b100010) {
+    // TODO: have to create custom masks for each instruction
+    // or else we get in trouble
+    // norm 100010
+    // immediate to register 101100
+    // immediate to register wide 101110
+    // immediate to register mem 1100011
+    u8 norm_mask = (1u << 5) | (1u << 1);
+    u8 immed_mask = (1u << 5) | (1u << 3) | (1u << 2);
+    u8 immed_wide_mask = (1u << 5) | (1u << 3) | (1u << 2) | (1u << 1);
+    u8 immed_reg_mask = (1u << 6) | (1u << 5) | (1u << 1) | 1;
+
+    if (bytes - norm_mask == 0) {
         mov->type = NORM;
-    } else {
+        return;
+    }
+        
+    if (bytes - immed_mask == 0) {
         mov->type = IMMED;
+        return;
+    }
+
+    if (bytes - immed_wide_mask == 0) {
+        mov->type = IMMED;
+        return;
+    }
+
+    if (bytes - immed_reg_mask == 0) {
+        mov->type = IMMED_REG_MEM;
+        return;
     }
 }
 
@@ -210,14 +183,15 @@ void backup_reg_func(Inst *mov, String_Builder *sb) {
         }
     }
 }
+
 void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
     u16 disp = 0;
-    char str[4];
+    char str[10];
     switch (mov->mod) {
     case MOD_NO_DISP:
         switch (mov->rm_field) {
         case 0b000:
-            sb_append_cstr(&mov->reg2, "[bx + di]");
+            sb_append_cstr(&mov->reg2, "[bx + si]");
             break;
         case 0b001:
             sb_append_cstr(&mov->reg2, "[bx + di]");
@@ -242,7 +216,7 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
         }
         break;
     case MOD_8B_DISP:
-        *index += 1;
+        // *index += 1;
         switch (mov->rm_field) {
         case 0b000:
             disp = buf[*index];
@@ -301,12 +275,13 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
             sb_append_cstr(&mov->reg2, "]");
             break;
         }
+        (*index)++;
         break;
     case MOD_16_DISP:
-        *index += 2;
+        // *index += 1;
         switch (mov->rm_field) {
         case 0b000:
-            disp = buf[*index] + buf[*index + 1];
+            i16 disp = combine_i8_to_i16(buf[*index], buf[*index + 1]);
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&mov->reg2, "[bx + si + ");
             sb_append_cstr(&mov->reg2, str);
@@ -362,6 +337,7 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
             sb_append_cstr(&mov->reg2, "]");
             break;
         }
+        // (*index)++;
         break; 
     case MOD_REG_MODE:
         break;
@@ -371,10 +347,14 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
 void determine_rm_field(Inst *mov, u8 *buf, size_t *index) {
     if (mov->mod == MOD_REG_MODE && mov->rm_field == 0b110) {
         calculate_effective_address(mov, buf, index);
-    } else if (mov->mod != MOD_REG_MODE) {
+        return;
+    } 
+    
+    if (mov->mod != MOD_REG_MODE) {
         calculate_effective_address(mov, buf, index);
+        return; 
     }
-
+    
     backup_reg_func(mov, &mov->reg2);
 }
 
@@ -383,7 +363,6 @@ void parse_immed_instruction(Inst *mov, u8 *buf, size_t *index) {
     mov->register_field = (buf[*index] & 0x3);
     mov->direction = true;
     (*index)++;
-    // mov.immed_value = buf[index];
     i8 disp = buf[*index];
 
     if (mov->wb == WORD) {
@@ -411,17 +390,15 @@ void parse_instruction(u8 *buf, size_t size) {
     
     while (index < size) {
         Inst mov = {0};
-        u8 instruction_bytes = (buf[index] >> 2) & 0x3F;
+        u8 instruction_bytes = (buf[index] >> 2) & 0xFE;
         check_instruction(&mov, instruction_bytes);
-        // mov.instruction = (buf[index] >> 2) & 0x3F;
-
+        
         if (mov.type == IMMED) {
             parse_immed_instruction(&mov, buf, &index);
             continue;
         }
         
-        
-        mov.direction = (buf[index] >> index) & 1;
+        mov.direction = (buf[index] >> 1) & 1;
         mov.wb = buf[index] & 0b1;
         index++;
         mov.mod = (buf[index] >> 6) & 0x3;
@@ -433,9 +410,9 @@ void parse_instruction(u8 *buf, size_t size) {
         if (mov.mod == MOD_REG_MODE && mov.rm_field == 0b110) {
             // index += 2;
         } else if (mov.mod == MOD_16_DISP) {
-            index += 2;
+            // index += 2;
         } else if (mov.mod == MOD_8B_DISP) {
-            index += 1;
+            // index += 1;
         }
 
         determine_rm_field(&mov, buf, &index);

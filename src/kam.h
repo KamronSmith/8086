@@ -1,3 +1,6 @@
+#ifndef KAM_H_
+#define KAM_H_
+
 #include <ctype.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -275,3 +278,5 @@ KAMDEF int string_find(String haystack, String needle) {
     }
     return -1;
 }
+
+#endif // KAM_H
