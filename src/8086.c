@@ -183,14 +183,15 @@ void backup_reg_func(Inst *mov, String_Builder *sb) {
         }
     }
 }
+
 void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
     u16 disp = 0;
-    char str[4];
+    char str[10];
     switch (mov->mod) {
     case MOD_NO_DISP:
         switch (mov->rm_field) {
         case 0b000:
-            sb_append_cstr(&mov->reg2, "[bx + di]");
+            sb_append_cstr(&mov->reg2, "[bx + si]");
             break;
         case 0b001:
             sb_append_cstr(&mov->reg2, "[bx + di]");
@@ -215,7 +216,7 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
         }
         break;
     case MOD_8B_DISP:
-        *index += 1;
+        // *index += 1;
         switch (mov->rm_field) {
         case 0b000:
             disp = buf[*index];
@@ -274,12 +275,13 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
             sb_append_cstr(&mov->reg2, "]");
             break;
         }
+        (*index)++;
         break;
     case MOD_16_DISP:
-        *index += 2;
+        // *index += 1;
         switch (mov->rm_field) {
         case 0b000:
-            disp = buf[*index] + buf[*index + 1];
+            i16 disp = combine_i8_to_i16(buf[*index], buf[*index + 1]);
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&mov->reg2, "[bx + si + ");
             sb_append_cstr(&mov->reg2, str);
@@ -335,6 +337,7 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
             sb_append_cstr(&mov->reg2, "]");
             break;
         }
+        // (*index)++;
         break; 
     case MOD_REG_MODE:
         break;
@@ -344,10 +347,14 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
 void determine_rm_field(Inst *mov, u8 *buf, size_t *index) {
     if (mov->mod == MOD_REG_MODE && mov->rm_field == 0b110) {
         calculate_effective_address(mov, buf, index);
-    } else if (mov->mod != MOD_REG_MODE) {
+        return;
+    } 
+    
+    if (mov->mod != MOD_REG_MODE) {
         calculate_effective_address(mov, buf, index);
+        return; 
     }
-
+    
     backup_reg_func(mov, &mov->reg2);
 }
 
@@ -385,17 +392,11 @@ void parse_instruction(u8 *buf, size_t size) {
         Inst mov = {0};
         u8 instruction_bytes = (buf[index] >> 2) & 0xFE;
         check_instruction(&mov, instruction_bytes);
-        // mov.instruction = (buf[index] >> 2) & 0x3F;
-
+        
         if (mov.type == IMMED) {
             parse_immed_instruction(&mov, buf, &index);
             continue;
         }
-
-        if (mov.type == IMMED_REG_MEM) {
-            
-        }
-        
         
         mov.direction = (buf[index] >> 1) & 1;
         mov.wb = buf[index] & 0b1;
@@ -409,9 +410,9 @@ void parse_instruction(u8 *buf, size_t size) {
         if (mov.mod == MOD_REG_MODE && mov.rm_field == 0b110) {
             // index += 2;
         } else if (mov.mod == MOD_16_DISP) {
-            index += 2;
+            // index += 2;
         } else if (mov.mod == MOD_8B_DISP) {
-            index += 1;
+            // index += 1;
         }
 
         determine_rm_field(&mov, buf, &index);
