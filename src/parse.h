@@ -46,6 +46,7 @@ typedef enum {
 } Inst_type;
 
 typedef struct {
+    String_Builder name;
     Inst_type type;
     DEST_field direction;
     WB_field wb;
