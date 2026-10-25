@@ -1,6 +1,10 @@
 TARGET := bin/8086
 SRC := src/8086.c
-CFLAGS := -Wall -Werror -Wextra -Wpedantic -O0 -g -fsanitize=address -lasan
+CFLAGS := -std=c23 -Wall -Werror -Wextra -Wpedantic -O0 -g -fsanitize=address
+
+ifeq ($(shell uname -s),Linux)
+	CFLAGS += -lasan
+endif
 
 default:
 	gcc $(SRC) -o $(TARGET) $(CFLAGS)
