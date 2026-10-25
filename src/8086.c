@@ -1,5 +1,9 @@
 #include "kam.h"
-#include <endian.h>
+#ifdef __APPLE__
+    #include <machine/endian.h>
+#else
+    #include <endian.h>
+#endif
 
 #define OPCODE_MOVE 26
 #define DIRECTION_MASK (0b1)
