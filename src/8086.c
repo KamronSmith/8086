@@ -24,6 +24,7 @@ void print_instruction(Inst *mov) {
     }
 
     free(mov->reg1.items);
+    free(mov->name.items);
     free(mov->reg2.items);
 }
 
