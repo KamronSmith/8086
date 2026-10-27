@@ -101,7 +101,8 @@ void determine_register(Inst *ins, String_Builder *sb) {
         default:
             printf("fuck\n");
         }
-    } else {
+    }
+    else {
         switch (ins->register_field) {
         case 0b000:
             sb_append_cstr(sb, "AL");
@@ -428,10 +429,9 @@ void parse_instruction(u8 *buf, size_t size) {
                 break;
             }
 
-            ins.mod = (buf[index] >> 6) & 0x3;
+            ins.mod = MOD_16_DISP; 
             ins.rm_field = buf[index] & 0b111;
-            determine_register(&ins, &ins.reg1);
-            // parse_immed_instruction(&ins, buf, &index);
+            backup_reg_func(&ins, &ins.reg1);
             determine_rm_field(&ins, buf, &index);
             print_instruction(&ins);
             continue;
