@@ -346,7 +346,7 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index) {
             sb_append_cstr(&mov->reg2, "]");
             break;
         }
-        // (*index)++;
+        *index += 2;
         break; 
     case MOD_REG_MODE:
         break;
