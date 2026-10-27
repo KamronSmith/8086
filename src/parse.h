@@ -45,6 +45,11 @@ typedef enum {
     IMMED_REG_MEM,
 } Inst_type;
 
+typedef enum {
+    FALSE,
+    TRUE,
+} Sign_extend;
+
 typedef struct {
     String_Builder name;
     Inst_type type;
@@ -53,6 +58,7 @@ typedef struct {
     MOD_field mod;
     u8 register_field;
     u8 rm_field;
+    Sign_extend sign;
     String_Builder reg1;
     String_Builder reg2;
 } Inst;
