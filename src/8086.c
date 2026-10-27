@@ -1,6 +1,11 @@
 #include <endian.h>
 #include "parse.h"
 #include "kam.h"
+#ifdef __APPLE__
+    #include <machine/endian.h>
+#else
+    #include <endian.h>
+#endif
 
 #define OPCODE_MOVE 26
 #define DIRECTION_MASK (0b1)
@@ -17,6 +22,9 @@ void print_instruction(Inst *mov) {
     } else {
         printf("mov %s, %s\n", mov->reg1.items, mov->reg2.items);
     }
+
+    free(mov->reg1.items);
+    free(mov->reg2.items);
 }
 
 i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
