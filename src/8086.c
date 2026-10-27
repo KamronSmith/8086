@@ -22,6 +22,9 @@ void print_instruction(Inst *mov) {
     } else {
         printf("mov %s, %s\n", mov->reg1.items, mov->reg2.items);
     }
+
+    free(mov->reg1.items);
+    free(mov->reg2.items);
 }
 
 i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
