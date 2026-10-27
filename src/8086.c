@@ -30,48 +30,50 @@ void print_instruction(Inst *mov) {
 
 i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
     u16 high_shifted = ((u16)(u8)high_byte << 8);
-
     u16 combined = high_shifted | ((u16)(u8)low_byte);
-
     return (i16)combined;
 }
 
-void check_instruction(Inst *mov, u8 bytes) {
-    // TODO: have to create custom masks for each instruction
-    // or else we get in trouble
-    // norm 100010
-    // immediate to register 101100
-    // immediate to register wide 101110
-    // immediate to register mem 1100011
-    u8 norm_mask = (1u << 5) | (1u << 1);
-    u8 immed_mask = (1u << 5) | (1u << 3) | (1u << 2);
-    u8 immed_wide_mask = (1u << 5) | (1u << 3) | (1u << 2) | (1u << 1);
-    u8 immed_reg_mask = (1u << 6) | (1u << 5) | (1u << 1) | 1;
-
-    if (bytes - norm_mask == 0) {
-        mov->type = NORM;
-        return;
-    }
-        
-    if (bytes - immed_mask == 0) {
-        mov->type = IMMED;
-        return;
-    }
-
-    if (bytes - immed_wide_mask == 0) {
-        mov->type = IMMED;
-        return;
-    }
-
-    if (bytes - immed_reg_mask == 0) {
-        mov->type = IMMED_REG_MEM;
-        return;
-    }
+void determine_instruction_type(Inst *ins, u8 bytes) {
+    switch (bytes) {
+    case 0: // ADD norm
+        sb_append_cstr(&ins->name, "add");
+        ins->type = NORM;
+        break;
+    case 6:  // CMP NORM
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = NORM;
+        break;
+    case 10: // SUB norm
+        sb_append_cstr(&ins->name, "sub");
+        ins->type = NORM;
+        break;
+    case 32: // ADD SUB CMP IMMED REG MEM
+        // sb_append_cstr(&ins->name, "fuck");
+        ins->type = IMMED_REG_MEM;
+        break;
+    case 34: // MOV NORM
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = NORM;
+        break;
+    case 44: // MOV IMMED REG 
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED;
+        break;
+    case 46: // MOV IMMED REG WIDE
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED;
+        break;
+    case 99: // MOV IMMED REG & MEM
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED_REG_MEM;
+        break;
+    }    
 }
 
-void determine_register(Inst *mov, String_Builder *sb) {
-    if (mov->wb == WORD) {
-        switch (mov->register_field) {
+void determine_register(Inst *ins, String_Builder *sb) {
+    if (ins->wb == WORD) {
+        switch (ins->register_field) {
         case 0b000:
             sb_append_cstr(sb, "AX");
             break;
