@@ -36,13 +36,31 @@ i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
 
 void determine_instruction_type(Inst *ins, u8 bytes) {
     switch (bytes) {
-    case 0: // ADD norm
+    case 0:
+        sb_append_cstr(&ins->name, "add");
+        ins->type = NORM;
+        ins->direction = SOURCE;
+        break;
+    case 1: // ADD norm
         sb_append_cstr(&ins->name, "add");
         ins->type = NORM;
         break;
-    case 6:  // CMP NORM
-        sb_append_cstr(&ins->name, "cmp");
+    case 2:
+        sb_append_cstr(&ins->name, "add");
+        ins->type = IMMED_ACCUM;
+        break;
+    case 4:
+        sb_append_cstr(&ins->name, "sub");
         ins->type = NORM;
+        ins->direction = SOURCE;
+        break;
+    case 5:
+        sb_append_cstr(&ins->name, "sub");
+        ins->type = NORM;
+        break;
+    case 6:  // CMP NORM
+        sb_append_cstr(&ins->name, "sub");
+        ins->type = IMMED_ACCUM;
         break;
     case 10: // SUB norm
         sb_append_cstr(&ins->name, "sub");
@@ -52,15 +70,55 @@ void determine_instruction_type(Inst *ins, u8 bytes) {
         // sb_append_cstr(&ins->name, "fuck");
         ins->type = IMMED_REG_MEM;
         break;
-    case 34: // MOV NORM
+    case 12:
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = NORM;
+        ins->direction = SOURCE;
+        break;
+    case 13:
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = NORM;
+        break;
+    case 14:
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = IMMED_ACCUM;
+        break;
+    case 28:
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = NORM;
+        break;
+    case 30:
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = IMMED_ACCUM;
+        break;
+    case 64:
+        ins->type = IMMED_REG_MEM;
+        break;
+    case 65:
+        ins->type = IMMED_REG_MEM;
+        break;
+    case 68:
         sb_append_cstr(&ins->name, "mov");
         ins->type = NORM;
         break;
-    case 44: // MOV IMMED REG
+    case 69:
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = NORM;
+        ins->direction = DEST;
+        break;
+    case 72:
         sb_append_cstr(&ins->name, "mov");
         ins->type = IMMED;
         break;
-    case 46: // MOV IMMED REG WIDE
+    case 74:
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED;
+        break;
+    case 76:
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED;
+        break;
+    case 77:
         sb_append_cstr(&ins->name, "mov");
         ins->type = IMMED;
         break;
@@ -228,7 +286,7 @@ void calculate_effective_address(Inst *ins, u8 *buf, size_t *index) {
         }
         break;
     case MOD_8B_DISP:
-        // *index += 1;
+        *index += 1;
         switch (ins->rm_field) {
         case 0b000:
             disp = buf[*index];
@@ -287,7 +345,7 @@ void calculate_effective_address(Inst *ins, u8 *buf, size_t *index) {
             sb_append_cstr(&ins->reg2, "]");
             break;
         }
-        (*index)++;
+        // (*index)++;
         break;
     case MOD_16_DISP:
         (*index)++;
@@ -345,6 +403,7 @@ void calculate_effective_address(Inst *ins, u8 *buf, size_t *index) {
         (*index)++;
         break;
     case MOD_REG_MODE:
+        backup_reg_func(ins, &ins->reg2);
         break;
     }
 }
@@ -365,9 +424,37 @@ void determine_rm_field(Inst *ins, u8 *buf, size_t *index) {
 
 void parse_immed_instruction(Inst *ins, u8 *buf, size_t *index)
 {
+    (*index)++;
     ins->wb = (buf[*index] >> 3) & 0b1;
     ins->register_field = (buf[*index] & 0x3);
     ins->direction = true;
+    (*index)++;
+    i8 disp = buf[*index];
+
+    if (ins->wb == WORD) {
+        (*index)++;
+        i16 disp_16 = combine_i8_to_i16(disp, buf[*index]);
+        char str[7];
+        snprintf(str, sizeof(str), "%i", disp_16);
+        sb_append_cstr(&ins->reg2, str);
+        determine_register(ins, &ins->reg1);
+        print_instruction(ins);
+        (*index)++;
+        return;
+    }
+
+    char str[5];
+    snprintf(str, sizeof(str), "%d", disp);
+    sb_append_cstr(&ins->reg2, str);
+    determine_register(ins, &ins->reg1);
+    print_instruction(ins);
+    (*index)++;
+}
+
+void parse_immed_accumulator(Inst *ins, u8 *buf, size_t *index) {
+    ins->wb = buf[*index] & 1;
+    ins->direction = DEST;
+
     (*index)++;
     i8 disp = buf[*index];
 
@@ -396,7 +483,7 @@ void parse_instruction(u8 *buf, size_t size) {
 
     while (index < size) {
         Inst ins = {0};
-        u8 instruction_bytes = (buf[index] >> 2) & 0xFE;
+        u8 instruction_bytes = (buf[index] >> 1) & 0xEF;
         determine_instruction_type(&ins, instruction_bytes);
 
         if (ins.type == IMMED) {
@@ -404,8 +491,13 @@ void parse_instruction(u8 *buf, size_t size) {
             continue;
         }
 
+        if (ins.type == IMMED_ACCUM) {
+            parse_immed_accumulator(&ins, buf, &index);
+            continue;
+        }
+
         // ADD, SUB, CMP immediates need to be checked in the second byte
-        if (ins.type == IMMED_REG_MEM && instruction_bytes == 32) {
+        if (ins.type == IMMED_REG_MEM && (instruction_bytes == 65 || instruction_bytes == 64)) {
             ins.sign = (buf[index] >> 1) & 0x1;
             ins.wb = buf[index] & 0b1;
             index++;
@@ -456,10 +548,10 @@ void parse_instruction(u8 *buf, size_t size) {
         ins.mod = (buf[index] >> 6) & 0x3;
         ins.register_field = (buf[index] >> 3) & 0x7;
         ins.rm_field = buf[index] & 0b111;
-        index++;
 
         determine_register(&ins, &ins.reg1);
         determine_rm_field(&ins, buf, &index);
         print_instruction(&ins);
+        index++;
     }
 }

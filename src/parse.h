@@ -43,6 +43,7 @@ typedef enum {
     NORM,
     IMMED,
     IMMED_REG_MEM,
+    IMMED_ACCUM,
 } Inst_type;
 
 typedef enum {
