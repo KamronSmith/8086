@@ -72,4 +72,5 @@ void calculate_effective_address(Inst *mov, u8 *buf, size_t *index);
 void determine_rm_field(Inst *mov, u8 *buf, size_t *index);
 void parse_immed_instruction(Inst *mov, u8 *buf, size_t *index);
 void parse_instruction(u8 *buf, size_t size);
+
 #endif // PARSE_H

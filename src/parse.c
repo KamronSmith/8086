@@ -56,7 +56,7 @@ void determine_instruction_type(Inst *ins, u8 bytes) {
         sb_append_cstr(&ins->name, "mov");
         ins->type = NORM;
         break;
-    case 44: // MOV IMMED REG 
+    case 44: // MOV IMMED REG
         sb_append_cstr(&ins->name, "mov");
         ins->type = IMMED;
         break;
@@ -68,7 +68,7 @@ void determine_instruction_type(Inst *ins, u8 bytes) {
         sb_append_cstr(&ins->name, "mov");
         ins->type = IMMED_REG_MEM;
         break;
-    }    
+    }
 }
 
 void determine_register(Inst *ins, String_Builder *sb) {
@@ -197,7 +197,7 @@ void backup_reg_func(Inst *ins, String_Builder *sb) {
 }
 
 void calculate_effective_address(Inst *ins, u8 *buf, size_t *index) {
-    u16 disp = 0;
+    i16 disp;
     char str[10];
     switch (ins->mod) {
     case MOD_NO_DISP:
@@ -290,67 +290,60 @@ void calculate_effective_address(Inst *ins, u8 *buf, size_t *index) {
         (*index)++;
         break;
     case MOD_16_DISP:
-        // *index += 1;
+        (*index)++;
+        disp = combine_i8_to_i16(buf[*index], buf[*index + 1]);
         switch (ins->rm_field) {
         case 0b000:
-            i16 disp = combine_i8_to_i16(buf[*index], buf[*index + 1]);
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bx + si + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b001:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bx + di + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b010:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bp + si + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b011:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bp + di + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b100:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[si + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b101:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[di + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b110:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bp + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         case 0b111:
-            disp = buf[*index] + buf[*index + 1];
             snprintf(str, sizeof(str), "%d", disp);
             sb_append_cstr(&ins->reg2, "[bx + ");
             sb_append_cstr(&ins->reg2, str);
             sb_append_cstr(&ins->reg2, "]");
             break;
         }
-        *index += 2;
-        break; 
+        (*index)++;
+        break;
     case MOD_REG_MODE:
         break;
     }
@@ -360,11 +353,11 @@ void determine_rm_field(Inst *ins, u8 *buf, size_t *index) {
     if (ins->mod == MOD_REG_MODE && ins->rm_field == 0b110) {
         calculate_effective_address(ins, buf, index);
         return;
-    } 
+    }
 
     if (ins->mod != MOD_REG_MODE) {
         calculate_effective_address(ins, buf, index);
-        return; 
+        return;
     }
 
     backup_reg_func(ins, &ins->reg2);
@@ -417,6 +410,8 @@ void parse_instruction(u8 *buf, size_t size) {
             ins.wb = buf[index] & 0b1;
             index++;
             ins.register_field = (buf[index] >> 3) & 0x7;
+            ins.mod = (buf[index] >> 6) & 0b11;
+            ins.rm_field = buf[index] & 0b111;
             switch (ins.register_field) {
             case 0:
                 sb_append_cstr(&ins.name, "add");
@@ -429,11 +424,28 @@ void parse_instruction(u8 *buf, size_t size) {
                 break;
             }
 
-            ins.mod = MOD_16_DISP; 
-            ins.rm_field = buf[index] & 0b111;
-            backup_reg_func(&ins, &ins.reg1);
-            determine_rm_field(&ins, buf, &index);
+            if (ins.mod != MOD_REG_MODE) {
+                calculate_effective_address(&ins, buf, &index);
+            }
+            else {
+                backup_reg_func(&ins, &ins.reg1);
+            }
+
+            index++;
+            i8 data = buf[index];
+            char str[10];
+            if (ins.wb == WORD) {
+                snprintf(str, sizeof(str), "%d", data);
+                sb_append_cstr(&ins.reg2, str);
+                print_instruction(&ins);
+                index++;
+                continue;
+            }
+
+            snprintf(str, sizeof(str), "%i", data);
+            sb_append_cstr(&ins.reg1, str);
             print_instruction(&ins);
+            index++;
             continue;
         }
 
