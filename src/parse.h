@@ -44,6 +44,7 @@ typedef enum {
     IMMED,
     IMMED_REG_MEM,
     IMMED_ACCUM,
+    JMP_CMP
 } Inst_type;
 
 typedef enum {

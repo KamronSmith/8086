@@ -35,98 +35,122 @@ i16 combine_i8_to_i16(i8 low_byte, i8 high_byte) {
 }
 
 void determine_instruction_type(Inst *ins, u8 bytes) {
-    switch (bytes) {
-    case 0:
+    if (bytes == 0 || bytes <= 0x03) {
         sb_append_cstr(&ins->name, "add");
         ins->type = NORM;
-        ins->direction = SOURCE;
-        break;
-    case 1: // ADD norm
-        sb_append_cstr(&ins->name, "add");
-        ins->type = NORM;
-        break;
-    case 2:
-        sb_append_cstr(&ins->name, "add");
-        ins->type = IMMED_ACCUM;
-        break;
-    case 4:
-        sb_append_cstr(&ins->name, "sub");
-        ins->type = NORM;
-        ins->direction = SOURCE;
-        break;
-    case 5:
-        sb_append_cstr(&ins->name, "sub");
-        ins->type = NORM;
-        break;
-    case 6:  // CMP NORM
-        sb_append_cstr(&ins->name, "sub");
-        ins->type = IMMED_ACCUM;
-        break;
-    case 10: // SUB norm
-        sb_append_cstr(&ins->name, "sub");
-        ins->type = NORM;
-        break;
-    case 32: // ADD SUB CMP IMMED REG MEM
-        // sb_append_cstr(&ins->name, "fuck");
-        ins->type = IMMED_REG_MEM;
-        break;
-    case 12:
-        sb_append_cstr(&ins->name, "cmp");
-        ins->type = NORM;
-        ins->direction = SOURCE;
-        break;
-    case 13:
-        sb_append_cstr(&ins->name, "cmp");
-        ins->type = NORM;
-        break;
-    case 14:
-        sb_append_cstr(&ins->name, "cmp");
-        ins->type = IMMED_ACCUM;
-        break;
-    case 28:
-        sb_append_cstr(&ins->name, "cmp");
-        ins->type = NORM;
-        break;
-    case 30:
-        sb_append_cstr(&ins->name, "cmp");
-        ins->type = IMMED_ACCUM;
-        break;
-    case 64:
-        ins->type = IMMED_REG_MEM;
-        break;
-    case 65:
-        ins->type = IMMED_REG_MEM;
-        break;
-    case 68:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = NORM;
-        break;
-    case 69:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = NORM;
-        ins->direction = DEST;
-        break;
-    case 72:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = IMMED;
-        break;
-    case 74:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = IMMED;
-        break;
-    case 76:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = IMMED;
-        break;
-    case 77:
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = IMMED;
-        break;
-    case 99: // MOV IMMED REG & MEM
-        sb_append_cstr(&ins->name, "mov");
-        ins->type = IMMED_REG_MEM;
-        break;
     }
+    else if (bytes == 0x04 || bytes == 0x05) {
+        sb_append_cstr(&ins->name, "add");
+        ins->type = IMMED_ACCUM;
+    }
+    else if (bytes >= 0x28 && bytes <= 0x2B) {
+        sb_append_cstr(&ins->name, "sub");
+        ins->type = NORM;
+    }
+    else if (bytes == 0x2C || bytes == 0x2D) {
+        sb_append_cstr(&ins->name, "sub");
+        ins->type = IMMED_ACCUM;
+    }
+    else if (bytes >= 0x38 && bytes <= 0x3B) {
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = NORM;
+    }
+    else if (bytes == 0x3C || bytes == 0x3D) {
+        sb_append_cstr(&ins->name, "cmp");
+        ins->type = IMMED_ACCUM;
+    }
+    else if (bytes == 0x70) {
+        sb_append_cstr(&ins->name, "jo");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x71) {
+        sb_append_cstr(&ins->name, "jno");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x72) {
+        sb_append_cstr(&ins->name, "jb");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x73) {
+        sb_append_cstr(&ins->name, "jnb");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x74) {
+        sb_append_cstr(&ins->name, "je");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x75) {
+        sb_append_cstr(&ins->name, "jnz");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x76) {
+        sb_append_cstr(&ins->name, "jbe");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x77) {
+        sb_append_cstr(&ins->name, "jnbe");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x78) {
+        sb_append_cstr(&ins->name, "js");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x79) {
+        sb_append_cstr(&ins->name, "jns");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7A) {
+        sb_append_cstr(&ins->name, "jp");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7B) {
+        sb_append_cstr(&ins->name, "jnp");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7C) {
+        sb_append_cstr(&ins->name, "jl");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7D) {
+        sb_append_cstr(&ins->name, "jnl");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7E) {
+        sb_append_cstr(&ins->name, "jle");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x7F) {
+        sb_append_cstr(&ins->name, "jnle");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0xe0) {
+        sb_append_cstr(&ins->name, "loopnz");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0xe1) {
+        sb_append_cstr(&ins->name, "loopz");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0xe2) {
+        sb_append_cstr(&ins->name, "loop");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0xe3) {
+        sb_append_cstr(&ins->name, "jcxz");
+        ins->type = JMP_CMP;
+    }
+    else if (bytes == 0x80 || bytes == 0x81 || bytes == 0x82 || bytes == 0x83) {
+        ins->type = IMMED_REG_MEM;
+    }
+    else if (bytes >= 0x88 && bytes <= 0x8B) {
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = NORM;
+    }
+    else if (bytes >= 0xB0 && bytes <= 0xBF) {
+        sb_append_cstr(&ins->name, "mov");
+        ins->type = IMMED;
+    }
+    return;
 }
 
 void determine_register(Inst *ins, String_Builder *sb) {
@@ -424,7 +448,9 @@ void determine_rm_field(Inst *ins, u8 *buf, size_t *index) {
 
 void parse_immed_instruction(Inst *ins, u8 *buf, size_t *index)
 {
-    (*index)++;
+
+    // (*index)++; disabled for MOV immed instructions only
+    // Need a new function just for MOV immed instructions
     ins->wb = (buf[*index] >> 3) & 0b1;
     ins->register_field = (buf[*index] & 0x3);
     ins->direction = true;
@@ -447,6 +473,17 @@ void parse_immed_instruction(Inst *ins, u8 *buf, size_t *index)
     snprintf(str, sizeof(str), "%d", disp);
     sb_append_cstr(&ins->reg2, str);
     determine_register(ins, &ins->reg1);
+    print_instruction(ins);
+    (*index)++;
+}
+
+void parse_jmp_cmp_instruction(Inst *ins, u8 *buf, size_t *index) {
+    (*index)++;
+    i8 label = buf[*index];
+
+    char str[5];
+    snprintf(str, sizeof(str), "%i", label);
+    sb_append_cstr(&ins->reg2, str);
     print_instruction(ins);
     (*index)++;
 }
@@ -483,7 +520,7 @@ void parse_instruction(u8 *buf, size_t size) {
 
     while (index < size) {
         Inst ins = {0};
-        u8 instruction_bytes = (buf[index] >> 1) & 0xEF;
+        u8 instruction_bytes = buf[index];
         determine_instruction_type(&ins, instruction_bytes);
 
         if (ins.type == IMMED) {
@@ -496,8 +533,13 @@ void parse_instruction(u8 *buf, size_t size) {
             continue;
         }
 
+        if (ins.type == JMP_CMP) {
+            parse_jmp_cmp_instruction(&ins, buf, &index);
+            continue;
+        }
+
         // ADD, SUB, CMP immediates need to be checked in the second byte
-        if (ins.type == IMMED_REG_MEM && (instruction_bytes == 65 || instruction_bytes == 64)) {
+        if (ins.type == IMMED_REG_MEM) {
             ins.sign = (buf[index] >> 1) & 0x1;
             ins.wb = buf[index] & 0b1;
             index++;
