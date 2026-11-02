@@ -1,9 +1,9 @@
 CompileFlags:
     Add:
     [
-        -Iinclude,
+    -Isrc,
 	-Wall,
 	-Werror,
 	-Wextra,
-	-Wpendantic
+	-Wpedantic
     ]
