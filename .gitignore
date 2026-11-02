@@ -1,3 +1,4 @@
 /bin/
 *.rdi
 *.asm
+tests/test
