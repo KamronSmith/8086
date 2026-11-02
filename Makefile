@@ -1,5 +1,5 @@
 CC := gcc
-BIN_DIR := bin/
+BIN_DIR := bin
 TARGET := $(BIN_DIR)/8086
 SRC := $(wildcard src/*.c)
 
